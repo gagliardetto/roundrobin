@@ -6,21 +6,19 @@ import (
 	"sync"
 )
 
-// ErrNoElements is the error that servers dose not exists
-var ErrNoElements = errors.New("no elements provided")
+// New returns a RoundRobin of []interface{}
+func New(elements []interface{}) (RoundRobin, error) {
+	if elements == nil || len(elements) == 0 {
+		return nil, ErrNoElements
+	}
 
-// RoundRobin is an interface for representing round-robin balancing.
-type RoundRobin interface {
-	Next() interface{}
-	Append(elem interface{})
-	Replace(elems []interface{})
-	Len() int
+	return newRR(elements), nil
 }
-
-type roundrobin struct {
-	elements []interface{}
-	next     int32
-	mu       *sync.Mutex
+func newRR(elems []interface{}) RoundRobin {
+	return &roundrobin{
+		elements: elems,
+		mu:       &sync.Mutex{},
+	}
 }
 
 // New returns a RoundRobin of []*url.URL
@@ -65,19 +63,21 @@ func NewInts(elements []int) (RoundRobin, error) {
 	return newRR(elems), nil
 }
 
-// New returns a RoundRobin of []interface{}
-func New(elements []interface{}) (RoundRobin, error) {
-	if elements == nil || len(elements) == 0 {
-		return nil, ErrNoElements
-	}
+// ErrNoElements is the error that servers dose not exists
+var ErrNoElements = errors.New("no elements provided")
 
-	return newRR(elements), nil
+// RoundRobin is an interface for representing round-robin balancing.
+type RoundRobin interface {
+	Next() interface{}
+	Append(elem interface{})
+	Replace(elems []interface{})
+	Len() int
 }
-func newRR(elems []interface{}) RoundRobin {
-	return &roundrobin{
-		elements: elems,
-		mu:       &sync.Mutex{},
-	}
+
+type roundrobin struct {
+	elements []interface{}
+	next     int32
+	mu       *sync.Mutex
 }
 
 // Next returns the next address
@@ -89,21 +89,29 @@ func (r *roundrobin) Next() interface{} {
 	return sc
 }
 
-// Next returns the next address
+// Append adds an element to the list of elements;
+// if the element is nil, it is ignored and not added.
 func (r *roundrobin) Append(elem interface{}) {
+	if elem == nil {
+		return
+	}
 	r.mu.Lock()
 	r.elements = append(r.elements, elem)
 	r.mu.Unlock()
 }
 
-// Next returns the next address
+// Replace replaces the list of elements with the provided one.
 func (r *roundrobin) Replace(elems []interface{}) {
+	if elems == nil || len(elems) == 0 {
+		return
+	}
 	r.mu.Lock()
+	r.next = 0
 	r.elements = elems
 	r.mu.Unlock()
 }
 
-// Next returns the next address
+// Len returns the count of how many elements are in the list.
 func (r *roundrobin) Len() int {
 	r.mu.Lock()
 	defer r.mu.Unlock()
