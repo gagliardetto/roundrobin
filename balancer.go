@@ -72,6 +72,7 @@ type RoundRobin interface {
 	Append(elem interface{})
 	Replace(elems []interface{})
 	Len() int
+	IterateAll(func(interface{}) bool)
 }
 
 type roundrobin struct {
@@ -116,4 +117,18 @@ func (r *roundrobin) Len() int {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	return len(r.elements)
+}
+
+// IterateAll iterates over all elements
+// (WARNING: it's a blocking operation)
+func (r *roundrobin) IterateAll(iterator func(interface{}) bool) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	for _, elem := range r.elements {
+		doContinue := iterator(elem)
+		if !doContinue {
+			break
+		}
+	}
 }
